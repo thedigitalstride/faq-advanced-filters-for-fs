@@ -1,5 +1,5 @@
 (function () {
-  // version 1.0.2
+  // version 1.0.3
 const DEBUG = true;
 
   // Centralized configuration for selectors and settings

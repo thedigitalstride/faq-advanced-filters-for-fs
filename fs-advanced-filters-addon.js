@@ -35,6 +35,31 @@
     }
   };
 
+  // ✅ Scroll-to-top helper after pagination
+  function scrollToTopAfterPagination() {
+    const scrollTarget =
+      document.querySelector(CONFIG.scrollTargetSelector) || document.body;
+
+    // Add logging to debug scroll-to-top behavior
+    if (DEBUG) {
+      console.log('🔍 Scroll-to-top triggered');
+      if (scrollTarget) {
+        console.log('✅ Scroll target found:', scrollTarget);
+      } else {
+        console.warn('⚠️ Scroll target not found. Defaulting to document.body');
+      }
+    }
+
+    setTimeout(() => {
+      if (scrollTarget) {
+        scrollTarget.scrollIntoView({ behavior: 'smooth' });
+        if (DEBUG) console.log('✅ Scrolled to target:', scrollTarget);
+      } else {
+        if (DEBUG) console.warn('⚠️ Scroll target is null. Skipping scroll.');
+      }
+    }, CONFIG.scrollDelay);
+  }
+
   // ✅ Tag first/last visible items
   function updateCMSItemClasses() {
     const allLists = document.querySelectorAll(CONFIG.cmsListSelector);
@@ -119,15 +144,6 @@
     }
 
     DEBUG && console.groupEnd();
-  }
-
-  // ✅ Scroll-to-top helper after pagination
-  function scrollToTopAfterPagination() {
-    const scrollTarget =
-      document.querySelector(CONFIG.scrollTargetSelector) || document.body;
-    setTimeout(() => {
-      scrollTarget.scrollIntoView({ behavior: 'smooth' });
-    }, CONFIG.scrollDelay);
   }
 
   // ✅ CMS Filter Init

@@ -1,18 +1,18 @@
 (function () {
   // version 1.0.2
-  //  const DEBUG = true;
+const DEBUG = true;
 
   // Centralized configuration for selectors and settings
   const CONFIG = {
-    navbarSelector: '.navbar-new', // Selector for the navbar
-    cmsListSelector: '[fs-cmsfilter-element="list"]', // Selector for CMS lists
-    cmsItemSelector: '.w-dyn-item', // Selector for CMS items
-    filterButtonSelector: '.fs-filter-button', // Selector for filter buttons
-    filterCountSelector: '[data-filter-count]', // Selector for filter count elements
-    filterMenuSelector: '.faqs_filter-menu', // Selector for the filter menu
-    scrollTargetSelector: '.faq_sticky-container', // Selector for the scroll-to-top target
-    fadeOutClass: 'fade-out', // Class to fade out elements
-    hideClass: 'hide', // Class to hide elements
+    navbarSelector: '[data-navbar]', // Custom attribute for the navbar
+    cmsListSelector: '[data-cms-list]', // Custom attribute for CMS lists
+    cmsItemSelector: '[data-cms-item]', // Custom attribute for CMS items
+    filterButtonSelector: '[data-filter-button]', // Custom attribute for filter buttons
+    filterCountSelector: '[data-filter-count]', // Custom attribute for filter count elements
+    filterMenuSelector: '[data-filter-menu]', // Custom attribute for the filter menu
+    scrollTargetSelector: '[data-scroll-target]', // Custom attribute for the scroll-to-top target
+    fadeOutClass: 'fade-out', // Class to fade out elements (can remain as a class)
+    hideClass: 'hide', // Class to hide elements (can remain as a class)
     firstItemClass: 'first-item', // Class for the first visible item
     lastItemClass: 'last-item', // Class for the last visible item
     timeoutDelay: 300, // Timeout delay for updates

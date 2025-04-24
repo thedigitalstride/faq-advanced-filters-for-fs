@@ -1,6 +1,7 @@
 (function () {
-  // version 1.0.6
-const DEBUG = true;
+  const version = "version 1.0.15";
+  const DEBUG = true;
+  if (DEBUG) console.log(version);
 
   // Centralized configuration for selectors and settings
   const CONFIG = {
@@ -26,6 +27,8 @@ const DEBUG = true;
     if (DEBUG) console.log(message, ...args);
   };
 
+  if (DEBUG) console.log('✅ Debug mode is enabled');
+
   // Utility: Add or remove classes
   const toggleClass = (element, className, condition) => {
     if (condition) {
@@ -39,25 +42,6 @@ const DEBUG = true;
   function scrollToTopAfterPagination() {
     if (DEBUG) console.log('🔍 scrollToTopAfterPagination function triggered');
     const scrollTarget = document.querySelector(CONFIG.scrollTargetSelector) || document.body;
-    if (DEBUG) {
-      console.log('🔍 CONFIG.scrollTargetSelector:', CONFIG.scrollTargetSelector);
-      console.log('🔍 Scroll target element:', scrollTarget);
-    }
-
-    if (scrollTarget) {
-      const styles = window.getComputedStyle(scrollTarget);
-      console.log('🔍 Scroll target styles:', styles);
-    }
-
-    // Existing debug logs
-    if (DEBUG) {
-      console.log('🔍 Scroll-to-top triggered');
-      if (scrollTarget) {
-        console.log('✅ Scroll target found:', scrollTarget);
-      } else {
-        console.warn('⚠️ Scroll target not found. Defaulting to document.body');
-      }
-    }
 
     setTimeout(() => {
       if (scrollTarget) {
@@ -169,15 +153,23 @@ const DEBUG = true;
 
         setTimeout(updateAll, CONFIG.timeoutDelay);
 
+        // Dispatch fsPageUpdate after filter updates
         filterInstance.listInstance.on('renderitems', () => {
-          setTimeout(updateAll, CONFIG.timeoutDelay);
+          setTimeout(() => {
+            hideEmptyFilters(filterInstance);
+            updateCMSItemClasses();
+            document.dispatchEvent(new Event('fsPageUpdate'));
+          }, CONFIG.timeoutDelay);
         });
 
-        document.addEventListener('fsPageUpdate', () => {
-          setTimeout(() => {
-            updateAll();
-            scrollToTopAfterPagination(); // Ensure this is called after DOM updates
-          }, CONFIG.timeoutDelay);
+        // Dispatch fsPageUpdate after pagination
+        document.querySelectorAll('[data-pagination-button]').forEach((button) => {
+          button.addEventListener('click', () => {
+            if (DEBUG) console.log('🔍 Pagination button clicked');
+            setTimeout(() => {
+              document.dispatchEvent(new Event('fsPageUpdate')); // Dispatch the event
+            }, CONFIG.timeoutDelay);
+          });
         });
       },
     ]);
@@ -212,6 +204,101 @@ const DEBUG = true;
   });
 
   document.addEventListener('fsPageUpdate', () => {
-    setTimeout(updateCMSItemClasses, CONFIG.timeoutDelay);
+    if (DEBUG) console.log('🔍 fsPageUpdate event triggered');
+    setTimeout(() => {
+      updateCMSItemClasses();
+      scrollToTopAfterPagination();
+    }, CONFIG.timeoutDelay + 200); // Add extra delay
   });
+
+  function resetOtherFilters(type) {
+    if (type === 'keyword') {
+      // Reset named tag filters
+      const activeFilters = document.querySelectorAll('[data-filter-button].active');
+      activeFilters.forEach((filter) => filter.classList.remove('active'));
+      if (DEBUG) console.log('🔄 Named tag filters reset due to keyword search');
+    } else if (type === 'tag') {
+      // Reset keyword search
+      const keywordInput = document.querySelector('[data-keyword-search]');
+      if (keywordInput) {
+        keywordInput.value = ''; // Clear the input value
+        keywordInput.classList.remove('active'); // Remove styling class
+        if (DEBUG) console.log('🔄 Keyword search reset due to named tag filter');
+      }
+    }
+  }
+
+  function debounce(func, delay) {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), delay);
+    };
+  }
+
+  const debouncedFsPageUpdate = debounce(() => {
+    document.dispatchEvent(new Event('fsPageUpdate'));
+  }, CONFIG.timeoutDelay);
+
+  const keywordInput = document.querySelector('[data-keyword-search]');
+  if (keywordInput) {
+    let previousValue = ''; // Track the previous value of the input
+
+    const debouncedFsPageUpdate = debounce(() => {
+      document.dispatchEvent(new Event('fsPageUpdate'));
+    }, CONFIG.timeoutDelay);
+
+    keywordInput.addEventListener('input', () => {
+      if (DEBUG) console.log('🔍 Keyword search input detected');
+
+      const currentValue = keywordInput.value.trim();
+
+      // Add or remove the class for visual state
+      if (currentValue) {
+        keywordInput.classList.add('active'); // Add styling class
+        if (DEBUG) console.log('🔄 Keyword search is active');
+      } else {
+        keywordInput.classList.remove('active'); // Remove styling class
+        if (DEBUG) console.log('🔄 Keyword search is inactive');
+      }
+
+      // Only reset named tag filters if the input value changes from empty to non-empty
+      if (!previousValue && currentValue) {
+        resetOtherFilters('keyword');
+        if (DEBUG) console.log('🔄 Named tag filters reset due to keyword search');
+      }
+
+      previousValue = currentValue; // Update the previous value
+
+      // Trigger updates without refreshing the UI unnecessarily
+      debouncedFsPageUpdate();
+    });
+  }
+
+  const clearFiltersButton = document.querySelector('[data-clear-filters]');
+  if (clearFiltersButton) {
+    clearFiltersButton.addEventListener('click', () => {
+      if (DEBUG) console.log('🔄 Clear Filters button clicked');
+
+      // Reset keyword search
+      const keywordInput = document.querySelector('[data-keyword-search]');
+      if (keywordInput) {
+        keywordInput.value = '';
+        keywordInput.classList.remove('active'); // Remove styling class
+        if (DEBUG) console.log('🔄 Keyword search reset');
+      }
+
+      // Reset named tag filters
+      const activeFilters = document.querySelectorAll('[data-filter-button].active');
+      activeFilters.forEach((filter) => {
+        filter.classList.remove('active'); // Remove active class
+        if (DEBUG) console.log('🔄 Named tag filter reset:', filter);
+      });
+
+      // Trigger updates
+      setTimeout(() => {
+        document.dispatchEvent(new Event('fsPageUpdate')); // Dispatch the event
+      }, CONFIG.timeoutDelay);
+    });
+  }
 })();

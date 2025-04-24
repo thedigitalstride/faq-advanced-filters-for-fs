@@ -1,6 +1,6 @@
 (function () {
-  const version = "version 1.0.15";
-  const DEBUG = true;
+  const version = "version 1.0.17";
+  const DEBUG = false;
   if (DEBUG) console.log(version);
 
   // Centralized configuration for selectors and settings

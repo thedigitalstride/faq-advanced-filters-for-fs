@@ -1,5 +1,5 @@
 (function () {
-  // version 1.0.4
+  // version 1.0.5
 const DEBUG = true;
 
   // Centralized configuration for selectors and settings
@@ -37,10 +37,19 @@ const DEBUG = true;
 
   // ✅ Scroll-to-top helper after pagination
   function scrollToTopAfterPagination() {
-    const scrollTarget =
-      document.querySelector(CONFIG.scrollTargetSelector) || document.body;
+    if (DEBUG) console.log('🔍 scrollToTopAfterPagination function triggered');
+    const scrollTarget = document.querySelector(CONFIG.scrollTargetSelector) || document.body;
+    if (DEBUG) {
+      console.log('🔍 CONFIG.scrollTargetSelector:', CONFIG.scrollTargetSelector);
+      console.log('🔍 Scroll target element:', scrollTarget);
+    }
 
-    // Add logging to debug scroll-to-top behavior
+    if (scrollTarget) {
+      const styles = window.getComputedStyle(scrollTarget);
+      console.log('🔍 Scroll target styles:', styles);
+    }
+
+    // Existing debug logs
     if (DEBUG) {
       console.log('🔍 Scroll-to-top triggered');
       if (scrollTarget) {
@@ -167,7 +176,7 @@ const DEBUG = true;
         document.addEventListener('fsPageUpdate', () => {
           setTimeout(() => {
             updateAll();
-            scrollToTopAfterPagination();
+            scrollToTopAfterPagination(); // Ensure this is called after DOM updates
           }, CONFIG.timeoutDelay);
         });
       },

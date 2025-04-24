@@ -1,6 +1,6 @@
 (function () {
-  // version 1.0.0
-  const DEBUG = true;
+  // version 1.0.2
+  //  const DEBUG = true;
 
   // Centralized configuration for selectors and settings
   const CONFIG = {

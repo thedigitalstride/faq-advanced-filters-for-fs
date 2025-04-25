@@ -1,5 +1,5 @@
 (function () {
-  const version = "version 1.0.17";
+  const version = "version 1.0.19";
   const DEBUG = false;
   if (DEBUG) console.log(version);
 
@@ -38,19 +38,47 @@
     }
   };
 
-  // ✅ Scroll-to-top helper after pagination
+  // ✅ Smooth scroll-to-top helper using GSAP
   function scrollToTopAfterPagination() {
     if (DEBUG) console.log('🔍 scrollToTopAfterPagination function triggered');
     const scrollTarget = document.querySelector(CONFIG.scrollTargetSelector) || document.body;
 
-    setTimeout(() => {
-      if (scrollTarget) {
-        scrollTarget.scrollIntoView({ behavior: 'smooth' });
-        if (DEBUG) console.log('✅ Scrolled to target:', scrollTarget);
-      } else {
-        if (DEBUG) console.warn('⚠️ Scroll target is null. Skipping scroll.');
-      }
-    }, CONFIG.scrollDelay);
+    if (scrollTarget) {
+      gsap.to(window, {
+        scrollTo: { y: scrollTarget, autoKill: true },
+        duration: 0.5, // Adjust duration for smoother or quicker scrolling
+        ease: "power2.out",
+      });
+      if (DEBUG) console.log('✅ Smooth scroll triggered to target:', scrollTarget);
+    } else {
+      if (DEBUG) console.warn('⚠️ Scroll target is null. Skipping scroll.');
+    }
+  }
+
+  // ✅ Smooth fade-out using GSAP
+  function fadeOutElement(element) {
+    gsap.to(element, {
+      opacity: 0,
+      duration: 0.3, // Adjust duration for smoother or quicker fades
+      onComplete: () => {
+        element.style.display = "none"; // Hide the element after fading out
+      },
+    });
+  }
+
+  // ✅ Smooth fade-in using GSAP
+  function fadeInElement(element) {
+    // Check if the element is already visible
+    if (element.style.display !== "none" && element.style.opacity === "1") {
+      return; // Skip the fade-in if the element is already visible
+    }
+
+    element.style.display = ""; // Ensure the element is visible
+    gsap.fromTo(
+      element,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.3 } // Adjust duration for smoother or quicker fades
+    );
   }
 
   // ✅ Tag first/last visible items
@@ -119,12 +147,10 @@
         }
 
         if (wrapper) {
-          wrapper.classList.remove(CONFIG.fadeOutClass);
           if (fullCount === 0) {
-            wrapper.classList.add(CONFIG.fadeOutClass);
-            setTimeout(() => (wrapper.style.display = 'none'), CONFIG.timeoutDelay);
+            fadeOutElement(wrapper); // Use GSAP fade-out
           } else {
-            wrapper.style.display = '';
+            fadeInElement(wrapper); // Use GSAP fade-in
           }
         }
       });
@@ -132,8 +158,7 @@
 
     const menu = document.querySelector(CONFIG.filterMenuSelector);
     if (menu) {
-      menu.classList.remove(CONFIG.hideClass);
-      menu.style.display = 'block';
+      fadeInElement(menu); // Use GSAP fade-in for the menu
     }
 
     DEBUG && console.groupEnd();

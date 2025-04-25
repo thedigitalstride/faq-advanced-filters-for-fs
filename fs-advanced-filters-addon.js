@@ -1,6 +1,6 @@
 (function () {
-  const version = "version 1.0.19";
-  const DEBUG = false;
+  const version = "version 1.0.41"; // Updated version number for clarity
+  const DEBUG = true;
   if (DEBUG) console.log(version);
 
   // Centralized configuration for selectors and settings
@@ -12,8 +12,8 @@
     filterCountSelector: '[data-filter-count]', // Custom attribute for filter count elements
     filterMenuSelector: '[data-filter-menu]', // Custom attribute for the filter menu
     scrollTargetSelector: '[data-scroll-target]', // Custom attribute for the scroll-to-top target
-    fadeOutClass: 'fade-out', // Class to fade out elements (can remain as a class)
-    hideClass: 'hide', // Class to hide elements (can remain as a class)
+    fadeOutClass: 'fade-out', // Class to fade out elements
+    hideClass: 'hide', // Class to hide elements
     firstItemClass: 'first-item', // Class for the first visible item
     lastItemClass: 'last-item', // Class for the last visible item
     timeoutDelay: 300, // Timeout delay for updates
@@ -27,17 +27,6 @@
     if (DEBUG) console.log(message, ...args);
   };
 
-  if (DEBUG) console.log('✅ Debug mode is enabled');
-
-  // Utility: Add or remove classes
-  const toggleClass = (element, className, condition) => {
-    if (condition) {
-      element.classList.add(className);
-    } else {
-      element.classList.remove(className);
-    }
-  };
-
   // ✅ Smooth scroll-to-top helper using GSAP
   function scrollToTopAfterPagination() {
     if (DEBUG) console.log('🔍 scrollToTopAfterPagination function triggered');
@@ -46,7 +35,7 @@
     if (scrollTarget) {
       gsap.to(window, {
         scrollTo: { y: scrollTarget, autoKill: true },
-        duration: 0.5, // Adjust duration for smoother or quicker scrolling
+        duration: 0.7, // Adjust duration for smoother or quicker scrolling
         ease: "power2.out",
       });
       if (DEBUG) console.log('✅ Smooth scroll triggered to target:', scrollTarget);
@@ -68,7 +57,6 @@
 
   // ✅ Smooth fade-in using GSAP
   function fadeInElement(element) {
-    // Check if the element is already visible
     if (element.style.display !== "none" && element.style.opacity === "1") {
       return; // Skip the fade-in if the element is already visible
     }
@@ -99,6 +87,7 @@
     });
   }
 
+  // ✅ Observe DOM changes for dynamic updates
   function observeListChanges() {
     const allLists = document.querySelectorAll(CONFIG.cmsListSelector);
     allLists.forEach((listContainer) => {
@@ -110,58 +99,81 @@
     });
   }
 
-  // ✅ Hide empty filters + count logic
-  function hideEmptyFilters(filterInstance) {
+  // ✅ Calculate and display static filter counts
+  function calculateFilterCounts(filterInstance) {
     const filterFields = filterInstance.filtersData;
     if (!filterFields?.length) return;
-    DEBUG && console.groupCollapsed('🧠 Filter Visibility Check');
 
     filterFields.forEach((filterField) => {
       filterField.elements.forEach((element) => {
-        const el = element.element;
-        const wrapper = el.closest(CONFIG.cmsItemSelector);
-        const currentCount = element.resultsCount;
+        const el = element.element.closest(CONFIG.filterButtonSelector);
+        if (!el) return;
 
-        // Store initial full count
-        if (!originalFilterCounts.has(el)) {
-          originalFilterCounts.set(el, currentCount);
-        }
-        const fullCount = originalFilterCounts.get(el);
+        const staticCount = element.resultsCount;
+        originalFilterCounts.set(el, staticCount);
 
-        // Update visible count UI
-        const countEl = el
-          .closest(CONFIG.filterButtonSelector)
-          ?.querySelector(CONFIG.filterCountSelector);
-        if (countEl) countEl.textContent = `(${fullCount})`;
-
-        if (DEBUG) {
-          const label = el.textContent.trim();
-          console.log(
-            `%c${label} → filtered: ${currentCount}, full: ${fullCount}`,
-            fullCount === 0
-              ? 'color: gray'
-              : currentCount === 0
-              ? 'color: orange'
-              : 'color: green'
-          );
-        }
-
-        if (wrapper) {
-          if (fullCount === 0) {
-            fadeOutElement(wrapper); // Use GSAP fade-out
-          } else {
-            fadeInElement(wrapper); // Use GSAP fade-in
-          }
+        const countEl = el.querySelector(CONFIG.filterCountSelector);
+        if (countEl) {
+          countEl.textContent = `(${staticCount})`;
+          logDebug(`🔢 Filter count set: ${staticCount}`);
         }
       });
     });
+  }
 
-    const menu = document.querySelector(CONFIG.filterMenuSelector);
-    if (menu) {
-      fadeInElement(menu); // Use GSAP fade-in for the menu
-    }
+  // ✅ Handle filter button clicks
+  function handleFilterClicks(filterInstance) {
+    const filterButtons = document.querySelectorAll(CONFIG.filterButtonSelector);
+    filterButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        button.classList.toggle('active');
+        logDebug('🔄 Filter button toggled:', button);
 
-    DEBUG && console.groupEnd();
+        // Trigger updates
+        document.dispatchEvent(new Event('fsPageUpdate'));
+      });
+    });
+  }
+
+  // ✅ Handle keyword search input
+  function handleKeywordSearch() {
+    const keywordInput = document.querySelector('[data-keyword-search]');
+    if (!keywordInput) return;
+
+    keywordInput.addEventListener('input', () => {
+      const value = keywordInput.value.trim();
+      if (value) {
+        keywordInput.classList.add('active');
+      } else {
+        keywordInput.classList.remove('active');
+      }
+
+      // Reset filters when keyword search is active
+      if (value) {
+        document.querySelectorAll('[data-filter-button].active').forEach((button) => {
+          button.classList.remove('active');
+        });
+      }
+
+      // Trigger updates
+      document.dispatchEvent(new Event('fsPageUpdate'));
+    });
+  }
+
+  // ✅ Initialize filters and pagination
+  function initFiltersAndPagination(filterInstance) {
+    calculateFilterCounts(filterInstance);
+    handleFilterClicks(filterInstance);
+
+    document.querySelectorAll('[data-pagination-button]').forEach((button) => {
+      button.addEventListener('click', () => {
+        logDebug('🔍 Pagination button clicked');
+        setTimeout(() => {
+          document.dispatchEvent(new Event('fsPageUpdate'));
+          scrollToTopAfterPagination();
+        }, CONFIG.timeoutDelay);
+      });
+    });
   }
 
   // ✅ CMS Filter Init
@@ -169,32 +181,14 @@
     window.fsAttributes.push([
       'cmsfilter',
       ([filterInstance]) => {
-        DEBUG && console.log('✅ CMS Filter initialized after loadAll');
+        logDebug('✅ CMS Filter initialized after loadAll');
 
-        const updateAll = () => {
-          hideEmptyFilters(filterInstance);
-          updateCMSItemClasses();
-        };
+        initFiltersAndPagination(filterInstance);
 
-        setTimeout(updateAll, CONFIG.timeoutDelay);
-
-        // Dispatch fsPageUpdate after filter updates
         filterInstance.listInstance.on('renderitems', () => {
           setTimeout(() => {
-            hideEmptyFilters(filterInstance);
-            updateCMSItemClasses();
             document.dispatchEvent(new Event('fsPageUpdate'));
           }, CONFIG.timeoutDelay);
-        });
-
-        // Dispatch fsPageUpdate after pagination
-        document.querySelectorAll('[data-pagination-button]').forEach((button) => {
-          button.addEventListener('click', () => {
-            if (DEBUG) console.log('🔍 Pagination button clicked');
-            setTimeout(() => {
-              document.dispatchEvent(new Event('fsPageUpdate')); // Dispatch the event
-            }, CONFIG.timeoutDelay);
-          });
         });
       },
     ]);
@@ -205,125 +199,31 @@
   window.fsAttributes.push([
     'cmsload',
     ([listInstance]) => {
-      DEBUG && console.log('📦 CMS Load triggered');
+      logDebug('📦 CMS Load triggered');
       if (typeof listInstance?.loadAll === 'function') {
         listInstance.loadAll().then(() => {
-          DEBUG && console.log('✅ All CMS items loaded via loadAll');
+          logDebug('✅ All CMS items loaded via loadAll');
           initCMSFilterAfterLoadAll();
         });
       } else {
-        DEBUG && console.warn('⚠️ loadAll not available. Proceeding without it.');
-        initCMSFilterAfterLoadAll();
+        logDebug('⚠️ loadAll not available. Proceeding without it.');
+        setTimeout(initCMSFilterAfterLoadAll, CONFIG.timeoutDelay);
       }
     },
   ]);
 
-  // ✅ Init first/last on load
+  // ✅ Init on DOMContentLoaded
   document.addEventListener('DOMContentLoaded', () => {
+    handleKeywordSearch();
     updateCMSItemClasses();
     observeListChanges();
   });
 
-  document.addEventListener('cmsload', () => {
-    setTimeout(updateCMSItemClasses, CONFIG.timeoutDelay);
-  });
-
   document.addEventListener('fsPageUpdate', () => {
-    if (DEBUG) console.log('🔍 fsPageUpdate event triggered');
+    logDebug('🔍 fsPageUpdate event triggered');
     setTimeout(() => {
       updateCMSItemClasses();
       scrollToTopAfterPagination();
-    }, CONFIG.timeoutDelay + 200); // Add extra delay
+    }, CONFIG.scrollDelay);
   });
-
-  function resetOtherFilters(type) {
-    if (type === 'keyword') {
-      // Reset named tag filters
-      const activeFilters = document.querySelectorAll('[data-filter-button].active');
-      activeFilters.forEach((filter) => filter.classList.remove('active'));
-      if (DEBUG) console.log('🔄 Named tag filters reset due to keyword search');
-    } else if (type === 'tag') {
-      // Reset keyword search
-      const keywordInput = document.querySelector('[data-keyword-search]');
-      if (keywordInput) {
-        keywordInput.value = ''; // Clear the input value
-        keywordInput.classList.remove('active'); // Remove styling class
-        if (DEBUG) console.log('🔄 Keyword search reset due to named tag filter');
-      }
-    }
-  }
-
-  function debounce(func, delay) {
-    let timeout;
-    return (...args) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), delay);
-    };
-  }
-
-  const debouncedFsPageUpdate = debounce(() => {
-    document.dispatchEvent(new Event('fsPageUpdate'));
-  }, CONFIG.timeoutDelay);
-
-  const keywordInput = document.querySelector('[data-keyword-search]');
-  if (keywordInput) {
-    let previousValue = ''; // Track the previous value of the input
-
-    const debouncedFsPageUpdate = debounce(() => {
-      document.dispatchEvent(new Event('fsPageUpdate'));
-    }, CONFIG.timeoutDelay);
-
-    keywordInput.addEventListener('input', () => {
-      if (DEBUG) console.log('🔍 Keyword search input detected');
-
-      const currentValue = keywordInput.value.trim();
-
-      // Add or remove the class for visual state
-      if (currentValue) {
-        keywordInput.classList.add('active'); // Add styling class
-        if (DEBUG) console.log('🔄 Keyword search is active');
-      } else {
-        keywordInput.classList.remove('active'); // Remove styling class
-        if (DEBUG) console.log('🔄 Keyword search is inactive');
-      }
-
-      // Only reset named tag filters if the input value changes from empty to non-empty
-      if (!previousValue && currentValue) {
-        resetOtherFilters('keyword');
-        if (DEBUG) console.log('🔄 Named tag filters reset due to keyword search');
-      }
-
-      previousValue = currentValue; // Update the previous value
-
-      // Trigger updates without refreshing the UI unnecessarily
-      debouncedFsPageUpdate();
-    });
-  }
-
-  const clearFiltersButton = document.querySelector('[data-clear-filters]');
-  if (clearFiltersButton) {
-    clearFiltersButton.addEventListener('click', () => {
-      if (DEBUG) console.log('🔄 Clear Filters button clicked');
-
-      // Reset keyword search
-      const keywordInput = document.querySelector('[data-keyword-search]');
-      if (keywordInput) {
-        keywordInput.value = '';
-        keywordInput.classList.remove('active'); // Remove styling class
-        if (DEBUG) console.log('🔄 Keyword search reset');
-      }
-
-      // Reset named tag filters
-      const activeFilters = document.querySelectorAll('[data-filter-button].active');
-      activeFilters.forEach((filter) => {
-        filter.classList.remove('active'); // Remove active class
-        if (DEBUG) console.log('🔄 Named tag filter reset:', filter);
-      });
-
-      // Trigger updates
-      setTimeout(() => {
-        document.dispatchEvent(new Event('fsPageUpdate')); // Dispatch the event
-      }, CONFIG.timeoutDelay);
-    });
-  }
 })();

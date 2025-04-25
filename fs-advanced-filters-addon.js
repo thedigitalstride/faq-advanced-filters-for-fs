@@ -1,6 +1,6 @@
 (function () {
   const version = "version 1.0.46"; // Updated version number for clarity
-  const DEBUG = true;
+  const DEBUG = false;
   if (DEBUG) console.log(version);
 
   // Centralized configuration for selectors and settings

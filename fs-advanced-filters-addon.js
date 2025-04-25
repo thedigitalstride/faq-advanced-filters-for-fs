@@ -1,5 +1,5 @@
 (function () {
-  const version = "version 1.0.45"; // Updated version number for clarity
+  const version = "version 1.0.46"; // Updated version number for clarity
   const DEBUG = true;
   if (DEBUG) console.log(version);
 

@@ -1,5 +1,5 @@
 (function () {
-  const version = "version 1.0.41"; // Updated version number for clarity
+  const version = "version 1.0.42"; // Updated version number for clarity
   const DEBUG = true;
   if (DEBUG) console.log(version);
 
@@ -187,12 +187,18 @@
 
         filterInstance.listInstance.on('renderitems', () => {
           setTimeout(() => {
-            document.dispatchEvent(new Event('fsPageUpdate'));
+            if (globalListInstance) {
+              document.dispatchEvent(new Event('fsPageUpdate'));
+            } else {
+              logDebug('⚠️ globalListInstance is not ready. Skipping fsPageUpdate.');
+            }
           }, CONFIG.timeoutDelay);
         });
       },
     ]);
   }
+
+  let globalListInstance = null; // Global variable to store the listInstance
 
   // ✅ Load All Items first
   window.fsAttributes = window.fsAttributes || [];
@@ -200,6 +206,16 @@
     'cmsload',
     ([listInstance]) => {
       logDebug('📦 CMS Load triggered');
+      globalListInstance = listInstance; // Store the listInstance globally
+
+      if (globalListInstance) {
+        logDebug('✅ globalListInstance successfully set:', globalListInstance);
+        logDebug('🔍 globalListInstance.items:', globalListInstance.items);
+        logDebug('🔍 globalListInstance.visibleItems:', globalListInstance.visibleItems);
+      } else {
+        logDebug('⚠️ globalListInstance is null or undefined.');
+      }
+
       if (typeof listInstance?.loadAll === 'function') {
         listInstance.loadAll().then(() => {
           logDebug('✅ All CMS items loaded via loadAll');
@@ -224,6 +240,37 @@
     setTimeout(() => {
       updateCMSItemClasses();
       scrollToTopAfterPagination();
+
+      if (globalListInstance && globalListInstance.items) {
+        updateResultsSummary(globalListInstance); // Pass the global listInstance
+      } else {
+        logDebug('⚠️ globalListInstance or its items are not defined. Skipping results summary update.');
+      }
     }, CONFIG.scrollDelay);
   });
+
+  function updateResultsSummary(listInstance) {
+    const resultsSummaryEl = document.querySelector('[data-results-summary]');
+    if (!resultsSummaryEl) return;
+
+    if (!listInstance || !listInstance.items) {
+      logDebug('⚠️ listInstance or its items are undefined. Skipping results summary update.');
+      resultsSummaryEl.textContent = 'No results available';
+      return;
+    }
+
+    // Calculate visible items manually if `visibleItems` is undefined
+    const visibleItems = listInstance.visibleItems || listInstance.items.filter((item) => item.valid);
+
+    const totalRecords = listInstance.items.length; // Total number of records
+    const filteredRecords = visibleItems.length; // Total filtered results
+    const currentPage = listInstance.page || 1; // Current page (if pagination is enabled)
+    const itemsPerPage = listInstance.pageSize || 50; // Items per page (default to 50)
+
+    const start = (currentPage - 1) * itemsPerPage + 1; // Start index of current page
+    const end = Math.min(currentPage * itemsPerPage, filteredRecords); // End index of current page
+
+    // Update the results summary text
+    resultsSummaryEl.textContent = `${start}-${end} of ${filteredRecords} Results`;
+  }
 })();

@@ -1,5 +1,5 @@
 (function () {
-  const version = "version 1.0.42"; // Updated version number for clarity
+  const version = "version 1.0.45"; // Updated version number for clarity
   const DEBUG = true;
   if (DEBUG) console.log(version);
 
@@ -20,7 +20,7 @@
     scrollDelay: 100, // Delay for scroll-to-top behavior
   };
 
-  const originalFilterCounts = new WeakMap();
+  const originalFilterCounts = new Map(); // Store original counts for each filter button
 
   // Utility: Log messages in debug mode
   const logDebug = (message, ...args) => {
@@ -29,7 +29,6 @@
 
   // ✅ Smooth scroll-to-top helper using GSAP
   function scrollToTopAfterPagination() {
-    if (DEBUG) console.log('🔍 scrollToTopAfterPagination function triggered');
     const scrollTarget = document.querySelector(CONFIG.scrollTargetSelector) || document.body;
 
     if (scrollTarget) {
@@ -38,7 +37,7 @@
         duration: 0.7, // Adjust duration for smoother or quicker scrolling
         ease: "power2.out",
       });
-      if (DEBUG) console.log('✅ Smooth scroll triggered to target:', scrollTarget);
+      logDebug('✅ Smooth scroll triggered to target:', scrollTarget);
     } else {
       if (DEBUG) console.warn('⚠️ Scroll target is null. Skipping scroll.');
     }
@@ -99,27 +98,67 @@
     });
   }
 
-  // ✅ Calculate and display static filter counts
-  function calculateFilterCounts(filterInstance) {
+  // Add this function to calculate initial counts
+  function calculateInitialCounts(filterInstance) {
+    const allItems = filterInstance.listInstance.items;
+    const counts = new Map();
+    
+    // Get all tags from all items
+    allItems.forEach(item => {
+        // Access tags data - it's a Finsweet filter object with a values Set
+        const tagData = item.props?.tags;
+        if (!tagData?.values) return;
+        
+        // Get tags from the values Set
+        tagData.values.forEach(tag => {
+            if (!tag) return;
+            const currentCount = counts.get(tag) || 0;
+            counts.set(tag, currentCount + 1);
+            logDebug(`📊 Updated count for "${tag}": ${currentCount + 1}`);
+        });
+    });
+    
+    logDebug('📊 Final counts:', Object.fromEntries(counts));
+    return counts;
+}
+
+// Modify the calculateFilterCounts function
+function calculateFilterCounts(filterInstance) {
     const filterFields = filterInstance.filtersData;
-    if (!filterFields?.length) return;
+    if (!filterFields?.length) {
+        logDebug('⚠️ No filter fields found');
+        return;
+    }
+
+    // Calculate total counts once and store them
+    const totalCounts = calculateInitialCounts(filterInstance);
+    logDebug('📊 Total counts calculated:', Object.fromEntries(totalCounts));
 
     filterFields.forEach((filterField) => {
-      filterField.elements.forEach((element) => {
-        const el = element.element.closest(CONFIG.filterButtonSelector);
-        if (!el) return;
+        // Only process tag filters
+        if (filterField.filterKeys[0] === 'tags') {
+            filterField.elements.forEach((element) => {
+                const el = element.element.closest(CONFIG.filterButtonSelector);
+                if (!el) return;
 
-        const staticCount = element.resultsCount;
-        originalFilterCounts.set(el, staticCount);
+                const filterValue = element.value;
+                logDebug(`🔍 Processing filter: "${filterValue}"`);
+                
+                // Get the total count for this tag
+                const totalCount = totalCounts.get(filterValue) || 0;
+                logDebug(`📊 Found count: ${totalCount} for "${filterValue}"`);
 
-        const countEl = el.querySelector(CONFIG.filterCountSelector);
-        if (countEl) {
-          countEl.textContent = `(${staticCount})`;
-          logDebug(`🔢 Filter count set: ${staticCount}`);
+                // Store and display the count
+                originalFilterCounts.set(el, totalCount);
+                const countEl = el.querySelector(CONFIG.filterCountSelector);
+                if (countEl) {
+                    countEl.textContent = `(${totalCount})`;
+                    logDebug(`✅ Total count set for "${filterValue}": ${totalCount}`);
+                }
+            });
         }
-      });
     });
-  }
+}
 
   // ✅ Handle filter button clicks
   function handleFilterClicks(filterInstance) {
@@ -135,28 +174,25 @@
     });
   }
 
-  // ✅ Handle keyword search input
+  // Optimize event handlers to use debouncing
   function handleKeywordSearch() {
     const keywordInput = document.querySelector('[data-keyword-search]');
     if (!keywordInput) return;
 
+    let timeout;
     keywordInput.addEventListener('input', () => {
-      const value = keywordInput.value.trim();
-      if (value) {
-        keywordInput.classList.add('active');
-      } else {
-        keywordInput.classList.remove('active');
-      }
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            const value = keywordInput.value.trim();
+            keywordInput.classList.toggle('active', !!value);
 
-      // Reset filters when keyword search is active
-      if (value) {
-        document.querySelectorAll('[data-filter-button].active').forEach((button) => {
-          button.classList.remove('active');
-        });
-      }
+            if (value) {
+                document.querySelectorAll('[data-filter-button].active')
+                    .forEach(btn => btn.classList.remove('active'));
+            }
 
-      // Trigger updates
-      document.dispatchEvent(new Event('fsPageUpdate'));
+            document.dispatchEvent(new Event('fsPageUpdate'));
+        }, 300);
     });
   }
 
@@ -169,64 +205,82 @@
       button.addEventListener('click', () => {
         logDebug('🔍 Pagination button clicked');
         setTimeout(() => {
-          document.dispatchEvent(new Event('fsPageUpdate'));
+          if (globalListInstance) {
+            document.dispatchEvent(new Event('fsPageUpdate')); // Trigger fsPageUpdate after pagination
+          } else {
+            logDebug('⚠️ globalListInstance is not defined. Skipping fsPageUpdate.');
+          }
           scrollToTopAfterPagination();
         }, CONFIG.timeoutDelay);
       });
     });
   }
 
-  // ✅ CMS Filter Init
-  function initCMSFilterAfterLoadAll() {
+  // ✅ Initialize filters and CMS after load
+  function initCMSFilterAfterLoadAll(listInstance) {
+    window.fsAttributes = window.fsAttributes || [];
     window.fsAttributes.push([
-      'cmsfilter',
-      ([filterInstance]) => {
-        logDebug('✅ CMS Filter initialized after loadAll');
-
-        initFiltersAndPagination(filterInstance);
-
-        filterInstance.listInstance.on('renderitems', () => {
-          setTimeout(() => {
-            if (globalListInstance) {
-              document.dispatchEvent(new Event('fsPageUpdate'));
-            } else {
-              logDebug('⚠️ globalListInstance is not ready. Skipping fsPageUpdate.');
-            }
-          }, CONFIG.timeoutDelay);
-        });
-      },
+        'cmsfilter',
+        ([filterInstance]) => {
+            logDebug('✅ CMS Filter initialized after loadAll');
+            calculateFilterCounts(filterInstance);
+            handleFilterClicks(filterInstance);
+            
+            // Listen for filter changes
+            filterInstance.listInstance.on('renderitems', () => {
+                setTimeout(() => {
+                    document.dispatchEvent(new Event('fsPageUpdate'));
+                }, CONFIG.timeoutDelay);
+            });
+        }
     ]);
   }
 
-  let globalListInstance = null; // Global variable to store the listInstance
+  let globalListInstance = null;
 
-  // ✅ Load All Items first
   window.fsAttributes = window.fsAttributes || [];
   window.fsAttributes.push([
     'cmsload',
-    ([listInstance]) => {
-      logDebug('📦 CMS Load triggered');
-      globalListInstance = listInstance; // Store the listInstance globally
+    async ([listInstance]) => {
+        logDebug('📦 CMS Load triggered');
+        globalListInstance = listInstance;
 
-      if (globalListInstance) {
-        logDebug('✅ globalListInstance successfully set:', globalListInstance);
-        logDebug('🔍 globalListInstance.items:', globalListInstance.items);
-        logDebug('🔍 globalListInstance.visibleItems:', globalListInstance.visibleItems);
-      } else {
-        logDebug('⚠️ globalListInstance is null or undefined.');
-      }
+        if (!globalListInstance) {
+            logDebug('⚠️ Failed to initialize globalListInstance');
+            return;
+        }
 
-      if (typeof listInstance?.loadAll === 'function') {
-        listInstance.loadAll().then(() => {
-          logDebug('✅ All CMS items loaded via loadAll');
-          initCMSFilterAfterLoadAll();
+        try {
+            if (typeof listInstance.loadAll === 'function') {
+                await listInstance.loadAll();
+                logDebug('✅ All CMS items loaded');
+            }
+
+            window.fsAttributes.push([
+                'cmsfilter',
+                ([filterInstance]) => {
+                    logDebug('✅ CMS Filter initialized');
+                    initializeFilterSystem(filterInstance);
+                }
+            ]);
+        } catch (error) {
+            logDebug('⚠️ Error during initialization:', error);
+        }
+    }
+]);
+
+function initializeFilterSystem(filterInstance) {
+    // Single point for filter initialization
+    calculateFilterCounts(filterInstance);
+    handleFilterClicks(filterInstance);
+
+    // Set up render listener once
+    filterInstance.listInstance.on('renderitems', () => {
+        requestAnimationFrame(() => {
+            document.dispatchEvent(new Event('fsPageUpdate'));
         });
-      } else {
-        logDebug('⚠️ loadAll not available. Proceeding without it.');
-        setTimeout(initCMSFilterAfterLoadAll, CONFIG.timeoutDelay);
-      }
-    },
-  ]);
+    });
+}
 
   // ✅ Init on DOMContentLoaded
   document.addEventListener('DOMContentLoaded', () => {
@@ -240,37 +294,6 @@
     setTimeout(() => {
       updateCMSItemClasses();
       scrollToTopAfterPagination();
-
-      if (globalListInstance && globalListInstance.items) {
-        updateResultsSummary(globalListInstance); // Pass the global listInstance
-      } else {
-        logDebug('⚠️ globalListInstance or its items are not defined. Skipping results summary update.');
-      }
     }, CONFIG.scrollDelay);
   });
-
-  function updateResultsSummary(listInstance) {
-    const resultsSummaryEl = document.querySelector('[data-results-summary]');
-    if (!resultsSummaryEl) return;
-
-    if (!listInstance || !listInstance.items) {
-      logDebug('⚠️ listInstance or its items are undefined. Skipping results summary update.');
-      resultsSummaryEl.textContent = 'No results available';
-      return;
-    }
-
-    // Calculate visible items manually if `visibleItems` is undefined
-    const visibleItems = listInstance.visibleItems || listInstance.items.filter((item) => item.valid);
-
-    const totalRecords = listInstance.items.length; // Total number of records
-    const filteredRecords = visibleItems.length; // Total filtered results
-    const currentPage = listInstance.page || 1; // Current page (if pagination is enabled)
-    const itemsPerPage = listInstance.pageSize || 50; // Items per page (default to 50)
-
-    const start = (currentPage - 1) * itemsPerPage + 1; // Start index of current page
-    const end = Math.min(currentPage * itemsPerPage, filteredRecords); // End index of current page
-
-    // Update the results summary text
-    resultsSummaryEl.textContent = `${start}-${end} of ${filteredRecords} Results`;
-  }
 })();

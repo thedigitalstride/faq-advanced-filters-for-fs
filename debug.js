@@ -55,6 +55,58 @@
     ([filterInstance]) => {
       console.log('✅ CMS Filter Initialized:', filterInstance);
 
+      // Track filter counts
+      const filterCounts = new Map();
+
+      // Store initial total counts
+      filterInstance.filtersData.forEach((filterData) => {
+        if (filterData.filterKeys[0] === 'tags') {
+          filterData.elements.forEach((element) => {
+            // Store initial total count
+            filterCounts.set(element.value, {
+              total: element.resultsCount,
+              filtered: element.resultsCount
+            });
+
+            console.log(`📊 Initial count for "${element.value}":`, {
+              total: element.resultsCount,
+              filtered: element.resultsCount
+            });
+          });
+        }
+      });
+
+      // Initialize results display
+      updateFilteredResults(filterInstance);
+
+      // Listen for filter changes
+      filterInstance.listInstance.on('renderitems', () => {
+        console.log('🔄 Filter state changed');
+        
+        filterInstance.filtersData.forEach((filterData) => {
+          if (filterData.filterKeys[0] === 'tags') {
+            filterData.elements.forEach((element) => {
+              const counts = filterCounts.get(element.value);
+              if (counts) {
+                counts.filtered = element.resultsCount;
+                console.log(`📊 Updated counts for "${element.value}":`, {
+                  total: counts.total,
+                  filtered: counts.filtered
+                });
+              }
+            });
+          }
+        });
+
+        // Log visible items after filter
+        const visibleItems = filterInstance.listInstance.items.filter(item => item.valid);
+        console.log('👁️ Currently visible items:', visibleItems.length);
+
+        updateFilteredResults(filterInstance);
+
+        updateFilteredResults(filterInstance);
+      });
+
       // Log filters data
       console.log('Filters Data:', filterInstance.filtersData);
 
@@ -109,6 +161,78 @@
           }
         });
       });
+
+      // Enhanced debug helper
+      const logFilterState = (filterInstance) => {
+        console.group('🔍 Current Filter State');
+        
+        // Log filter details
+        filterInstance.filtersData.forEach(filterData => {
+            if (filterData.filterKeys[0] === 'tags') {
+                console.group(`Filter: ${filterData.filterKeys[0]}`);
+                
+                filterData.elements.forEach(element => {
+                    const isActive = element.element.closest('.is-active');
+                    console.log(`${element.value}: {
+                        active: ${isActive ? '✅' : '❌'},
+                        count: ${element.resultsCount},
+                        total: ${element.initialCount || element.resultsCount}
+                    }`);
+                });
+                
+                console.groupEnd();
+            }
+        });
+
+        // Log item counts
+        const visibleItems = filterInstance.listInstance.items.filter(item => item.valid);
+        console.log(`Visible/Total: ${visibleItems.length}/${filterInstance.listInstance.items.length}`);
+        
+        // Log pagination info
+        const pageSize = 50;
+        const currentPage = Math.ceil(visibleItems.length / pageSize);
+        console.log('Pagination:', {
+            currentPage,
+            totalPages: Math.ceil(filterInstance.listInstance.items.length / pageSize),
+            itemsPerPage: pageSize,
+            visibleItems: visibleItems.length
+        });
+        
+        console.groupEnd();
+      };
+
+      // Add this to the cmsfilter event handler
+      window.fsAttributes.push([
+        'cmsfilter',
+        ([filterInstance]) => {
+            console.log('✅ CMS Filter Initialized:', filterInstance);
+
+            // Store initial counts
+            filterInstance.filtersData.forEach(filterData => {
+                if (filterData.filterKeys[0] === 'tags') {
+                    filterData.elements.forEach(element => {
+                        element.initialCount = element.resultsCount;
+                        console.log(`📊 Initial count for "${element.value}": ${element.resultsCount}`);
+                    });
+                }
+            });
+
+            // Listen for filter changes
+            filterInstance.listInstance.on('renderitems', () => {
+                requestAnimationFrame(() => {
+                    logFilterState(filterInstance);
+                    updateFilteredResults(filterInstance);
+                    updateFinsweetAttributes(
+                        filterInstance.listInstance.items.filter(item => item.valid),
+                        filterInstance.listInstance.items.length
+                    );
+                });
+            });
+
+            // Initial state logging
+            logFilterState(filterInstance);
+        }
+      ]);
     },
   ]);
 
@@ -125,6 +249,47 @@
     if (resultsCount) resultsCount.textContent = visibleItems.length;
 
     console.log('✅ Finsweet Attributes Updated');
+  };
+
+  // Add this after the existing updateFinsweetAttributes function
+  const updateFilteredResults = (filterInstance) => {
+    const resultsElement = document.querySelector('[data-filtered-results]');
+    if (!resultsElement) {
+        console.log('⚠️ No results element found with [data-filtered-results]');
+        return;
+    }
+
+    // Get active filters
+    const activeFilters = filterInstance.filtersData
+        .flatMap(filterData => 
+            filterData.elements
+                .filter(element => element.active)
+                .map(element => ({
+                    category: filterData.filterKeys[0],
+                    value: element.value,
+                    count: element.resultsCount
+                }))
+        )
+        .filter(filter => filter.value); // Remove empty values
+
+    // Get total and visible items
+    const totalItems = filterInstance.listInstance.items.length;
+    const visibleItems = filterInstance.listInstance.items.filter(item => item.valid).length;
+
+    // Create results text
+    let resultsText = '';
+    if (activeFilters.length === 0) {
+        resultsText = `Showing all ${totalItems} items`;
+    } else {
+        const filterText = activeFilters
+            .map(filter => `${filter.value} (${filter.count})`)
+            .join(', ');
+        resultsText = `Showing ${visibleItems} of ${totalItems} items | Filtered by: ${filterText}`;
+    }
+
+    // Update the element
+    resultsElement.textContent = resultsText;
+    console.log('✅ Filtered results updated:', resultsText);
   };
 
   // Check cmscore.listInstances after a delay

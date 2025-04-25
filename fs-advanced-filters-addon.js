@@ -18,6 +18,7 @@
     lastItemClass: 'last-item', // Class for the last visible item
     timeoutDelay: 300, // Timeout delay for updates
     scrollDelay: 100, // Delay for scroll-to-top behavior
+    filteredResultsSelector: '[data-filtered-results]', // Add this line
   };
 
   const originalFilterCounts = new Map(); // Store original counts for each filter button
@@ -160,6 +161,52 @@ function calculateFilterCounts(filterInstance) {
     });
 }
 
+// Modify updateFilteredResults function
+function updateFilteredResults(filterInstance) {
+    const resultsElement = document.querySelector(CONFIG.filteredResultsSelector);
+    if (!resultsElement) {
+        logDebug('⚠️ No results element found');
+        return;
+    }
+
+    // Get total and visible items
+    const totalItems = filterInstance.listInstance.items.length;
+    const visibleItems = filterInstance.listInstance.items.filter(item => item.valid);
+    const numVisible = visibleItems.length;
+
+    // Calculate pagination details
+    const pageSize = 50; // Match your CMS collection list page size
+    const currentPage = Math.ceil(filterInstance.listInstance.currentPage || 1);
+    const startIndex = (currentPage - 1) * pageSize + 1;
+    const endIndex = Math.min(startIndex + pageSize - 1, numVisible);
+
+    // Get active filters
+    const activeFilters = filterInstance.filtersData
+        .filter(filterData => filterData.filterKeys[0] === 'tags')
+        .flatMap(filterData => 
+            filterData.elements
+                .filter(element => element.element.closest('.is-active'))
+                .map(element => ({
+                    value: element.value,
+                    filtered: element.resultsCount
+                }))
+        );
+
+    // Create results text
+    let resultsText = '';
+    if (numVisible === 0) {
+        resultsText = 'No results found';
+    } else if (activeFilters.length === 0) {
+        resultsText = `Showing ${startIndex} to ${endIndex} from ${totalItems} results`;
+    } else {
+        resultsText = `Showing ${startIndex} to ${endIndex} from ${numVisible} filtered results`;
+    }
+
+    // Update the element
+    resultsElement.textContent = resultsText;
+    logDebug('✅ Updated filtered results:', resultsText);
+}
+
   // ✅ Handle filter button clicks
   function handleFilterClicks(filterInstance) {
     const filterButtons = document.querySelectorAll(CONFIG.filterButtonSelector);
@@ -269,14 +316,19 @@ function calculateFilterCounts(filterInstance) {
     }
 ]);
 
+// Modify initializeFilterSystem function
 function initializeFilterSystem(filterInstance) {
-    // Single point for filter initialization
+    // Calculate initial counts
     calculateFilterCounts(filterInstance);
     handleFilterClicks(filterInstance);
 
-    // Set up render listener once
+    // Initial results display
+    updateFilteredResults(filterInstance);
+
+    // Set up render listener
     filterInstance.listInstance.on('renderitems', () => {
         requestAnimationFrame(() => {
+            updateFilteredResults(filterInstance);
             document.dispatchEvent(new Event('fsPageUpdate'));
         });
     });
